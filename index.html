@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ocular Manifestations of Genetic Disease</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: #0a0e1a;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* ── Divider label ── */
+#divider-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.12);
+  pointer-events: none;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* ── Node labels ── */
+.node-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  pointer-events: all;
+  text-align: center;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+.node-dot {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  margin: 0 auto 5px;
+  transition: all 0.3s ease;
+}
+.node-text {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+/* DIM state — improved visibility */
+.node-label.dim .node-dot  { background: #4a5278; box-shadow: none; }
+.node-label.dim .node-text { color: #7a84aa; }
+
+/* CONNECTOR nodes (hemochromatosis, TLR7) */
+.node-label.connector .node-dot  { background: #374060; border: 1px dashed #5a6490; box-shadow: none; }
+.node-label.connector .node-text { color: #6070a0; font-style: italic; font-size: 10.5px; }
+.node-label.connector.active-link .node-dot  { background: #2a3060; border: 1px dashed #8899cc; }
+.node-label.connector.active-link .node-text { color: #9aaad0; }
+
+/* Cluster active colours */
+.node-label.active-A .node-dot  { background: #a78bfa; box-shadow: 0 0 18px 5px #7c3aed55; }
+.node-label.active-A .node-text { color: #c4b5fd; }
+.node-label.active-B .node-dot  { background: #34d399; box-shadow: 0 0 18px 5px #05966988; }
+.node-label.active-B .node-text { color: #6ee7b7; }
+.node-label.active-C .node-dot  { background: #fbbf24; box-shadow: 0 0 18px 5px #d9770688; }
+.node-label.active-C .node-text { color: #fde68a; }
+.node-label.active-D .node-dot  { background: #60a5fa; box-shadow: 0 0 18px 5px #2563eb88; }
+.node-label.active-D .node-text { color: #bfdbfe; }
+
+/* Thematic-linked (dimly lit when a node is active) */
+.node-label.linked .node-dot  { background: #6070a8; box-shadow: 0 0 8px 2px rgba(150,160,220,0.25); }
+.node-label.linked .node-text { color: #a0aad0; }
+
+/* ── Side labels ── */
+.side-label {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0.22;
+}
+
+/* ── Info card ── */
+#card {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(14px);
+  width: min(700px, 93vw);
+  background: rgba(8, 11, 26, 0.97);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  padding: 18px 22px 16px;
+  pointer-events: all;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+#card.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+#card-header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 11px; }
+#card-name { font-size: 15px; font-weight: 600; color: #f1f5f9; }
+#card-tag {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; padding: 2px 9px; border-radius: 20px;
+}
+#card-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px 18px; }
+.cc .cl { color: #3d4a6a; font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 2px; }
+.cc .cv { color: #b0bcd8; font-size: 11.5px; line-height: 1.45; }
+.cc.full { grid-column: 1/-1; }
+#card-links { margin-top: 10px; border-top: 0.5px solid rgba(255,255,255,0.06); padding-top: 9px; }
+.link-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 5px; font-size: 11px; line-height: 1.4; }
+.link-pill {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 1px 7px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; margin-top: 1px;
+}
+.link-targets { color: #6878a0; }
+.link-targets strong { color: #8898c0; font-weight: 500; }
+#card-note { font-size: 10.5px; color: #3d4a6a; margin-top: 9px; font-style: italic; border-top: 0.5px solid rgba(255,255,255,0.05); padding-top: 8px; line-height: 1.5; }
+#card-close { position: absolute; top: 13px; right: 17px; font-size: 12px; color: #3d4a6a; cursor: pointer; pointer-events: all; }
+#card-close:hover { color: #7888b0; }
+
+/* ── Controls ── */
+#controls {
+  position: absolute; top: 18px; right: 20px;
+  display: flex; gap: 7px;
+  pointer-events: all;
+}
+.ctrl-btn {
+  font-size: 10.5px; color: #4a5a80;
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.09);
+  border-radius: 6px; padding: 5px 13px;
+  cursor: pointer; transition: color 0.2s, background 0.2s;
+  letter-spacing: 0.02em;
+}
+.ctrl-btn:hover { color: #8898c0; background: rgba(255,255,255,0.07); }
+.ctrl-btn.on { color: #c4b5fd; border-color: rgba(167,139,250,0.4); background: rgba(124,58,237,0.12); }
+
+/* ── Title ── */
+#title {
+  position: absolute; top: 21px; left: 24px;
+  font-size: 11.5px; font-weight: 500;
+  color: rgba(255,255,255,0.18);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* ── Legend ── */
+#legend {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 18px; pointer-events: none; flex-wrap: wrap; justify-content: center;
+}
+.leg { display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: rgba(255,255,255,0.28); letter-spacing: 0.03em; }
+.leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Thematic legend ── */
+#theme-legend {
+  position: absolute; bottom: 28px; left: 18px;
+  display: none; flex-direction: column; gap: 5px;
+  pointer-events: none;
+}
+#theme-legend.visible { display: flex; }
+.tleg { display: flex; align-items: center; gap: 6px; font-size: 9.5px; color: rgba(255,255,255,0.35); }
+.tleg-line { width: 22px; height: 2px; border-radius: 1px; flex-shrink: 0; }
+
+/* ── Counter ── */
+#counter {
+  position: absolute; bottom: 18px; right: 22px;
+  font-size: 10.5px; color: rgba(255,255,255,0.18);
+  pointer-events: none; letter-spacing: 0.04em;
+}
+#hint {
+  position: absolute; bottom: 18px; left: 18px;
+  font-size: 9.5px; color: rgba(255,255,255,0.12);
+  pointer-events: none; letter-spacing: 0.03em;
+}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<canvas id="lines"></canvas>
+<canvas id="tlines"></canvas>
+
+<div id="ui">
+  <div id="title">Ocular manifestations of genetic disease</div>
+
+  <div id="legend">
+    <div class="leg"><div class="leg-dot" style="background:#a78bfa"></div>Eye dominant / ophtho leads</div>
+    <div class="leg"><div class="leg-dot" style="background:#34d399"></div>Co-equal</div>
+    <div class="leg"><div class="leg-dot" style="background:#fbbf24"></div>Ophtho triggered by referral</div>
+    <div class="leg"><div class="leg-dot" style="background:#60a5fa"></div>Systemic-first</div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" onclick="prevNode()">← Prev</button>
+    <button class="ctrl-btn" onclick="nextNode()">Next →</button>
+    <button id="btn-links" class="ctrl-btn" onclick="toggleLinkMode()">⬡ All links</button>
+    <button class="ctrl-btn" onclick="resetAll()">Reset</button>
+    <button class="ctrl-btn" onclick="toggleFullscreen()">⛶ Full</button>
+  </div>
+
+  <div id="side-left"  class="side-label" style="color:#a78bfa"></div>
+  <div id="side-right" class="side-label" style="color:#60a5fa"></div>
+  <div id="divider-label">← ocular dominant · systemic-first →</div>
+
+  <div id="nodes"></div>
+
+  <div id="theme-legend"></div>
+
+  <div id="card">
+    <div id="card-close" onclick="closeCard()">✕</div>
+    <div id="card-header">
+      <span id="card-name"></span>
+      <span id="card-tag"></span>
+    </div>
+    <div id="card-grid"></div>
+    <div id="card-links"></div>
+    <div id="card-note"></div>
+  </div>
+
+  <div id="counter"></div>
+  <div id="hint">Click a node · ← → keys · F = fullscreen</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// THEMATIC LINK CATEGORIES
+// ═══════════════════════════════════════════════════════════════
+const THEMES = {
+  metabolic:    { label: 'Metabolic / circulating molecule', color: '#f472b6', dash: [6,3] },
+  blood:        { label: 'Blood disorder / haematological',  color: '#fb923c', dash: [4,4] },
+  autoinflamm:  { label: 'Autoinflammation / innate immune', color: '#f87171', dash: [8,3] },
+  mito:         { label: 'Mitochondrial / energy metabolism',color: '#facc15', dash: [5,3] },
+  ciliopathy:   { label: 'Ciliopathy',                       color: '#38bdf8', dash: [3,3] },
+  tumour:       { label: 'Tumour suppressor / phakomatosis', color: '#4ade80', dash: [7,3] },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// DISEASE NODES
+// Horizontal layout:
+//   LEFT (cx < 0.46):  eye-dominant / ophtho-led  (clusters A + partial B)
+//   RIGHT (cx > 0.54): systemic-first / eye secondary (clusters C + D + partial B)
+//   MID:  connector nodes, shared/co-equal
+// ═══════════════════════════════════════════════════════════════
+const diseases = [
+  // ── LEFT SIDE — Eye dominant ──────────────────────────────
+  { id:'usher',   name:'Usher syndrome',       cluster:'A', cx:0.06, cy:0.30, connector:false,
+    eye:'Photoreceptors (RP)', disc:'Ophtho – ENT', concern:'Primarily ophtho', gene:'MYO7A, USH2A, CLRN1 (AR)',
+    links:[ {theme:'ciliopathy', targets:['bbs','nphp'], note:'All three are ciliopathies affecting photoreceptor outer segments'} ],
+    note:'RP drives adult disability. Cochlear implant planning must account for visual prognosis.' },
+
+  { id:'pxe',     name:'PXE', cluster:'A', cx:0.12, cy:0.18, connector:false,
+    eye:'Angioid streaks / CNV', disc:'Ophtho – dermato', concern:'Primarily ophtho', gene:'ABCC6 (AR)',
+    links:[ {theme:'metabolic', targets:['gyrate','hemo'], note:'Abnormal circulating molecules damage Bruch\'s membrane (mineralization in PXE; iron overload in hemochromatosis; ornithine in gyrate)'} ],
+    note:'Anti-VEGF for CNV. Classic dual-specialty disease — visual morbidity dominates the patient\'s disability.' },
+
+  { id:'gyrate',  name:'Gyrate atrophy', cluster:'A', cx:0.08, cy:0.46, connector:false,
+    eye:'Photoreceptors', disc:'Other specialist', concern:'Primarily ophtho', gene:'OAT (AR)',
+    links:[ {theme:'metabolic', targets:['pxe','hemo'], note:'Excess ornithine (gyrate), iron (hemochromatosis), and mineralization (PXE) all damage ocular structures via circulating metabolite accumulation'} ],
+    note:'Low-arginine diet reduces plasma ornithine. Ophthalmologist drives management despite metabolic substrate.' },
+
+  { id:'rosah',   name:'ROSAH', cluster:'A', cx:0.20, cy:0.38, connector:false,
+    eye:'Photoreceptors + uveitis', disc:'Ophtho > other', concern:'Other specialist', gene:'ALPK1 (AD)',
+    links:[ {theme:'autoinflamm', targets:['blau','vexas','tlr7'], note:'ALPK1 (ROSAH), NOD2 (Blau), UBA1 (VEXAS), and TLR7 all activate innate immune/NF-κB pathways causing autoinflammatory eye disease'} ],
+    note:'Newly described (2019). Ophtho discovers, but systemic autoinflammation requires haematology/immunology co-management.' },
+
+  { id:'chm',     name:'CHM syndromic del.', cluster:'A', cx:0.16, cy:0.62, connector:false,
+    eye:'Photoreceptors (choroideremia)', disc:'Other specialist', concern:'Co-equal', gene:'CHM + Xq21 del. (XL)',
+    links:[ {theme:'ciliopathy', targets:['usher','bbs'], note:'CHM (REP1) is involved in vesicular trafficking shared with ciliary processes in photoreceptors'} ],
+    note:'Isolated CHM = ophtho-led. Syndromic deletion (ID, deafness) shifts to genetics-led. Size of deletion determines phenotype.' },
+
+  { id:'coq2',    name:'COQ2', cluster:'A', cx:0.24, cy:0.70, connector:false,
+    eye:'Photoreceptors (cone-rod)', disc:'Other specialist', concern:'Co-equal', gene:'COQ2 (AR)',
+    links:[ {theme:'mito', targets:['ks','midd'], note:'COQ2 deficiency impairs mitochondrial electron transport chain; KS and MIDD/MELAS also cause retinal dystrophy via mitochondrial dysfunction'} ],
+    note:'Retinal dystrophy often found after renal transplant. Oral CoQ10 supplementation may slow progression.' },
+
+  // ── CENTRE-LEFT — Co-equal, ophtho-leaning ───────────────
+  { id:'bbs',     name:'Bardet-Biedl', cluster:'B', cx:0.32, cy:0.14, connector:false,
+    eye:'Photoreceptors (RP)', disc:'Other specialist', concern:'Co-equal', gene:'BBS1–21 (BBSome, AR)',
+    links:[ {theme:'ciliopathy', targets:['usher','nphp','cohen'], note:'BBS, Usher, NPHP, and Cohen syndrome (VPS13B) all involve ciliary/vesicular trafficking defects affecting photoreceptors'} ],
+    note:'RP is often the first recognised symptom in childhood. Polydactyly + night blindness = BBS until proved otherwise.' },
+
+  { id:'midd',    name:'MIDD / MELAS', cluster:'B', cx:0.38, cy:0.26, connector:false,
+    eye:'Macular dystrophy', disc:'Ophtho > other', concern:'Co-equal', gene:'mtDNA m.3243A>G',
+    links:[ {theme:'mito', targets:['ks','coq2'], note:'MIDD/MELAS, Kearns-Sayre and COQ2 all impair mitochondrial oxidative phosphorylation; RPE and photoreceptors are exquisitely sensitive to energy failure'} ],
+    note:'FAF perifoveal pattern is pathognomonic for m.3243A>G — ophthalmologist can trigger mtDNA testing.' },
+
+  { id:'ks',      name:'Kearns-Sayre', cluster:'B', cx:0.30, cy:0.38, connector:false,
+    eye:'Photoreceptors + CPEO', disc:'Other specialist', concern:'Co-equal', gene:'mtDNA large deletion (sporadic)',
+    links:[ {theme:'mito', targets:['midd','coq2'], note:'Large mtDNA deletion (KS), point mutation m.3243A>G (MIDD/MELAS), and CoQ10 biosynthesis defect (COQ2) share mitochondrial RPE/photoreceptor failure'} ],
+    note:'ECG mandatory — cardiac conduction defects can cause sudden death. Distinguish from isolated CPEO.' },
+
+  { id:'vhl',     name:'VHL', cluster:'B', cx:0.40, cy:0.48, connector:false,
+    eye:'Hemangioblastomas', disc:'Co-equal', concern:'Co-equal', gene:'VHL (AD, tumour suppressor)',
+    links:[ {theme:'tumour', targets:['nf1'], note:'VHL and NF1 are both tumour suppressor genes causing phakomatosis-spectrum disease with characteristic ocular findings (hemangioblastoma vs Lisch nodules/OPG)'} ],
+    note:'Retinal hemangioblastoma is often the earliest manifestation. Annual surveillance: ophtho + MRI + abdominal imaging.' },
+
+  { id:'cohen',   name:'Cohen syndrome', cluster:'B', cx:0.34, cy:0.60, connector:false,
+    eye:'Photoreceptors (RP-like)', disc:'Other specialist', concern:'Co-equal', gene:'VPS13B / COH1 (AR)',
+    links:[ {theme:'ciliopathy', targets:['bbs','nphp'], note:'VPS13B (Cohen), BBS genes (BBSome), and NPHP1 all affect vesicular/ciliary trafficking essential for photoreceptor outer segment renewal'} ],
+    note:'Underdiagnosed. Progressive myopia + RP-like dystrophy + intellectual disability + neutropenia = Cohen syndrome.' },
+
+  { id:'nphp',    name:'NPHP1', cluster:'B', cx:0.42, cy:0.70, connector:false,
+    eye:'Photoreceptors', disc:'Other specialist', concern:'Co-equal', gene:'NPHP1 (AR)',
+    links:[ {theme:'ciliopathy', targets:['bbs','usher','cohen'], note:'Nephronophthisis (NPHP1), BBS, Usher, and Cohen syndrome form a ciliopathy spectrum — photoreceptor outer segment renewal requires intact ciliary trafficking in all'} ],
+    note:'~10% of NPHP have retinal involvement (Senior-Løken). Ophthalmology should be part of routine NPHP workup.' },
+
+  // ── CENTRE-RIGHT — Co-equal, systemic-leaning ────────────
+  { id:'nf1',     name:'NF1', cluster:'C', cx:0.60, cy:0.20, connector:false,
+    eye:'Lisch nodules + OPG', disc:'Co-equal', concern:'Other specialist', gene:'NF1 (AD, tumour suppressor)',
+    links:[ {theme:'tumour', targets:['vhl'], note:'NF1 and VHL: both phakomatoses caused by tumour suppressor gene loss; ocular features are diagnostic criteria and surveillance targets'} ],
+    note:'Lisch nodules are a diagnostic criterion. Annual ophtho surveillance for OPG in childhood. CNS tumours drive prognosis.' },
+
+  { id:'alport',  name:'Alport syndrome', cluster:'C', cx:0.66, cy:0.36, connector:false,
+    eye:'Posterior lenticonus + macular', disc:'Other specialist', concern:'Other specialist', gene:'COL4A5/A3/A4 (XL/AR/AD)',
+    links:[ {theme:'metabolic', targets:['hemo'], note:'Both Alport (collagen IV) and hemochromatosis involve structural/metabolic damage to basement membranes and multiple organ systems beyond the eye'} ],
+    note:'Posterior lenticonus is pathognomonic. Slit-lamp can precede renal biopsy and prompt genetic testing.' },
+
+  { id:'sca',     name:'SCA', cluster:'C', cx:0.72, cy:0.26, connector:false,
+    eye:'Photoreceptors (SCA7) + gaze', disc:'Other > ophtho', concern:'Other specialist', gene:'ATXN1/2/3/6/7 (AD, CAG repeats)',
+    links:[ {theme:'mito', targets:['ks'], note:'SCA and Kearns-Sayre both present with progressive ophthalmoplegia + ataxia; mitochondrial vs polyglutamine mechanisms but overlapping neuro-ophthalmic phenotype'} ],
+    note:'SCA7 exception: cone-rod dystrophy can precede cerebellar ataxia. Worth separating SCA7 in teaching.' },
+
+  // ── RIGHT SIDE — Systemic-first ───────────────────────────
+  { id:'vexas',   name:'VEXAS', cluster:'D', cx:0.80, cy:0.32, connector:false,
+    eye:'Secondary (uveitis/scleritis)', disc:'Other specialist', concern:'Haematologist/rheum.', gene:'UBA1 (XL somatic, acquired)',
+    links:[
+      {theme:'blood',       targets:['hemo','lupus'],  note:'VEXAS, hemochromatosis, and monogenic lupus all involve a primary haematological/bone marrow disease with secondary ocular involvement'},
+      {theme:'autoinflamm', targets:['blau','rosah','tlr7'], note:'UBA1 (VEXAS), NOD2 (Blau), ALPK1 (ROSAH), and TLR7 all converge on innate immune activation causing inflammatory eye disease'}
+    ],
+    note:'Man >50, refractory uveitis + macrocytic anaemia + relapsing polychondritis → think VEXAS. Described 2020.' },
+
+  { id:'lupus',   name:'Monogenic lupus', cluster:'D', cx:0.88, cy:0.46, connector:false,
+    eye:'Secondary (inflammatory)', disc:'Other specialist', concern:'Other specialist', gene:'C1Q, TREX1, DNASE1L3 etc.',
+    links:[
+      {theme:'blood',       targets:['vexas','hemo'],  note:'All three involve a systemic haematological/immune disorder (interferon activation, iron overload, ubiquitin pathway) with secondary eye involvement'},
+      {theme:'autoinflamm', targets:['blau','tlr7'],   note:'Monogenic lupus (TREX1, DNASE1L3), TLR7 gain-of-function, and Blau (NOD2) are all monogenic autoinflammatory/autoimmune diseases'}
+    ],
+    note:'Consider in paediatric-onset lupus. May respond differently to treatment than acquired SLE. WES/WGS needed.' },
+
+  { id:'blau',    name:'Blau syndrome', cluster:'D', cx:0.84, cy:0.62, connector:false,
+    eye:'Secondary (granulomatous uveitis)', disc:'Other > ophtho', concern:'Other specialist', gene:'NOD2 (AD, gain-of-function)',
+    links:[
+      {theme:'autoinflamm', targets:['rosah','vexas','tlr7'], note:'NOD2 (Blau), ALPK1 (ROSAH), UBA1 (VEXAS), and TLR7 all activate innate immune pathways; granulomatous or neutrophilic inflammation causes uveitis/scleritis'}
+    ],
+    note:'Distinguish from sarcoidosis (NOD2-negative, acquired). Granulomatous panuveitis can be the most vision-threatening feature.' },
+
+  // ── CONNECTOR NODES ───────────────────────────────────────
+  { id:'hemo',    name:'Hemochromatosis', cluster:'_', cx:0.50, cy:0.54, connector:true,
+    eye:'Angioid streaks (iron overload)', disc:'Haematologist/hepatologist', concern:'Systemic (iron overload)', gene:'HFE (AR)',
+    links:[
+      {theme:'metabolic', targets:['pxe','gyrate'],    note:'Angioid streaks in hemochromatosis, PXE, and gyrate atrophy share a common endpoint: structural weakness of Bruch\'s membrane from different metabolic insults'},
+      {theme:'blood',     targets:['vexas','lupus'],   note:'Hemochromatosis, VEXAS, and monogenic lupus all involve bone marrow / haematological dysfunction with downstream ocular effects'}
+    ],
+    note:'Connector node — not in the primary 18 but linked to PXE, gyrate atrophy, VEXAS, and monogenic lupus via metabolic/haematological pathways.' },
+
+  { id:'tlr7',    name:'TLR7 GOF', cluster:'_', cx:0.72, cy:0.60, connector:true,
+    eye:'Secondary (uveitis)', disc:'Rheumatologist/immunologist', concern:'Systemic autoimmunity', gene:'TLR7 (XL, gain-of-function)',
+    links:[
+      {theme:'autoinflamm', targets:['blau','vexas','rosah','lupus'], note:'TLR7 gain-of-function (Mevalonate kinase / interferonopathy spectrum), NOD2 (Blau), ALPK1 (ROSAH), and UBA1 (VEXAS) converge on innate immune hyperactivation causing inflammatory uveitis'}
+    ],
+    note:'Connector node — TLR7 gain-of-function causes lupus-like interferonopathy; uveitis is a recognised feature linking it to Blau, ROSAH, VEXAS, and monogenic lupus.' },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// CLUSTER META
+// ═══════════════════════════════════════════════════════════════
+const clusterMeta = {
+  A: { name:'Eye dominant / ophtho leads', color:'#a78bfa', bg:'rgba(124,58,237,0.14)', border:'rgba(167,139,250,0.28)' },
+  B: { name:'Co-equal',                   color:'#34d399', bg:'rgba(5,150,105,0.14)',   border:'rgba(52,211,153,0.28)' },
+  C: { name:'Ophtho by referral',         color:'#fbbf24', bg:'rgba(217,119,6,0.14)',   border:'rgba(251,191,36,0.28)' },
+  D: { name:'Systemic-first',             color:'#60a5fa', bg:'rgba(37,99,235,0.14)',   border:'rgba(96,165,250,0.28)' },
+  _: { name:'Connector node',             color:'#8090c0', bg:'rgba(80,100,160,0.10)',  border:'rgba(120,140,200,0.20)' },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// CANVAS SETUP
+// ═══════════════════════════════════════════════════════════════
+const starCanvas  = document.getElementById('stars');
+const lineCanvas  = document.getElementById('lines');
+const tlineCanvas = document.getElementById('tlines');
+const sl = starCanvas.getContext('2d');
+const ll = lineCanvas.getContext('2d');
+const tl = tlineCanvas.getContext('2d');
+
+const W = () => window.innerWidth;
+const H = () => window.innerHeight;
+
+function drawStars() {
+  starCanvas.width = W(); starCanvas.height = H();
+  sl.clearRect(0,0,W(),H());
+  for (let i=0;i<300;i++){
+    sl.beginPath();
+    sl.arc(Math.random()*W(), Math.random()*H(), Math.random()*1.3+0.15, 0, Math.PI*2);
+    sl.fillStyle=`rgba(255,255,255,${Math.random()*0.28+0.05})`; sl.fill();
+  }
+  // vertical divider
+  ll.clearRect(0,0,W(),H());
+  ll.strokeStyle='rgba(255,255,255,0.06)'; ll.lineWidth=0.5;
+  ll.setLineDash([4,8]);
+  ll.beginPath(); ll.moveTo(W()*0.50,60); ll.lineTo(W()*0.50,H()-60); ll.stroke();
+  ll.setLineDash([]);
+}
+
+function drawClusterLines(activeCluster) {
+  ll.clearRect(0,0,W(),H());
+  // redraw divider
+  ll.strokeStyle='rgba(255,255,255,0.06)'; ll.lineWidth=0.5;
+  ll.setLineDash([4,8]);
+  ll.beginPath(); ll.moveTo(W()*0.50,60); ll.lineTo(W()*0.50,H()-60); ll.stroke();
+  ll.setLineDash([]);
+
+  ['A','B','C','D'].forEach(cl=>{
+    const members = diseases.filter(d=>d.cluster===cl && !d.connector);
+    const col={A:'#7c3aed',B:'#059669',C:'#d97706',D:'#2563eb'}[cl];
+    const focused = activeCluster===null || activeCluster===cl;
+    ll.strokeStyle = col + Math.round((focused?0.20:0.04)*255).toString(16).padStart(2,'0');
+    ll.lineWidth = focused ? 1.0 : 0.5;
+    ll.setLineDash([]);
+    members.forEach(d=>{
+      members.filter(o=>o.id!==d.id)
+        .map(o=>({o,dist:Math.hypot((o.cx-d.cx)*W(),(o.cy-d.cy)*H())}))
+        .sort((a,b)=>a.dist-b.dist).slice(0,2)
+        .forEach(({o})=>{
+          ll.beginPath(); ll.moveTo(d.cx*W(),d.cy*H()); ll.lineTo(o.cx*W(),o.cy*H()); ll.stroke();
+        });
+    });
+  });
+}
+
+function drawThematicLines(activeId, showAll) {
+  tlineCanvas.width = W(); tlineCanvas.height = H();
+  tl.clearRect(0,0,W(),H());
+
+  const byId = {};
+  diseases.forEach(d=>byId[d.id]=d);
+
+  const drawn = new Set();
+  diseases.forEach(src=>{
+    if (!src.links) return;
+    const isActive = src.id === activeId;
+    if (!showAll && !isActive) return;
+
+    src.links.forEach(lk=>{
+      const theme = THEMES[lk.theme];
+      if (!theme) return;
+      lk.targets.forEach(tid=>{
+        const tgt = byId[tid]; if (!tgt) return;
+        const key = [src.id,tid].sort().join('|')+lk.theme;
+        if (drawn.has(key)) return;
+        drawn.add(key);
+
+        const alpha = showAll ? 0.35 : (isActive ? 0.70 : 0.10);
+        tl.strokeStyle = theme.color + Math.round(alpha*255).toString(16).padStart(2,'0');
+        tl.lineWidth = isActive ? 1.8 : 1.0;
+        tl.setLineDash(theme.dash);
+        tl.beginPath();
+        tl.moveTo(src.cx*W(), src.cy*H());
+        // slight curve via midpoint offset
+        const mx = (src.cx+tgt.cx)/2 * W();
+        const my = (src.cy+tgt.cy)/2 * H() - 18;
+        tl.quadraticCurveTo(mx, my, tgt.cx*W(), tgt.cy*H());
+        tl.stroke();
+        tl.setLineDash([]);
+      });
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NODE DOM
+// ═══════════════════════════════════════════════════════════════
+let activeNode  = null;
+let activeIndex = -1;
+let linkModeOn  = false;
+
+const mainDiseases = diseases.filter(d=>!d.connector);
+
+function buildNodes() {
+  const container = document.getElementById('nodes');
+  container.innerHTML='';
+  diseases.forEach((d,i)=>{
+    const el = document.createElement('div');
+    el.className = 'node-label dim' + (d.connector?' connector':'');
+    el.id = 'node-'+d.id;
+    el.style.left = (d.cx*W())+'px';
+    el.style.top  = (d.cy*H())+'px';
+    el.innerHTML = `<div class="node-dot"></div><div class="node-text">${d.name}</div>`;
+    el.addEventListener('click', ()=>activateNode(d));
+    container.appendChild(el);
+  });
+}
+
+function getLinkedIds(d) {
+  if (!d || !d.links) return new Set();
+  const s = new Set();
+  d.links.forEach(lk=>lk.targets.forEach(t=>s.add(t)));
+  return s;
+}
+
+function activateNode(d) {
+  if (activeNode && activeNode.id===d.id) { resetAll(); return; }
+
+  // dim all
+  diseases.forEach(x=>{
+    const el = document.getElementById('node-'+x.id);
+    el.className = 'node-label dim' + (x.connector?' connector':'');
+  });
+
+  // set active
+  const el = document.getElementById('node-'+d.id);
+  el.className = 'node-label active-' + (d.connector?'A':d.cluster) + (d.connector?' connector':'');
+  activeNode = d;
+  activeIndex = mainDiseases.findIndex(x=>x.id===d.id);
+
+  // light linked nodes
+  const linked = getLinkedIds(d);
+  linked.forEach(tid=>{
+    const tel = document.getElementById('node-'+tid);
+    if (tel) {
+      const td = diseases.find(x=>x.id===tid);
+      tel.className = 'node-label linked' + (td&&td.connector?' connector':'');
+    }
+  });
+
+  drawClusterLines(d.connector?null:d.cluster);
+  drawThematicLines(d.id, linkModeOn);
+  showCard(d);
+  updateThemeLegend(d, linkModeOn);
+}
+
+function nextNode() {
+  if (mainDiseases.length===0) return;
+  const next = (activeIndex+1) % mainDiseases.length;
+  activateNode(mainDiseases[next]);
+}
+function prevNode() {
+  if (mainDiseases.length===0) return;
+  const prev = (activeIndex-1+mainDiseases.length) % mainDiseases.length;
+  activateNode(mainDiseases[prev]);
+}
+
+function toggleLinkMode() {
+  linkModeOn = !linkModeOn;
+  document.getElementById('btn-links').classList.toggle('on', linkModeOn);
+  drawThematicLines(activeNode?activeNode.id:null, linkModeOn);
+  updateThemeLegend(activeNode, linkModeOn);
+}
+
+function updateThemeLegend(d, showAll) {
+  const leg = document.getElementById('theme-legend');
+  if (!d && !showAll) { leg.classList.remove('visible'); return; }
+
+  const usedThemes = new Set();
+  if (showAll) {
+    diseases.forEach(x=>(x.links||[]).forEach(lk=>usedThemes.add(lk.theme)));
+  } else if (d && d.links) {
+    d.links.forEach(lk=>usedThemes.add(lk.theme));
+  }
+  if (usedThemes.size===0) { leg.classList.remove('visible'); return; }
+
+  leg.innerHTML = '';
+  usedThemes.forEach(k=>{
+    const t = THEMES[k]; if(!t) return;
+    const row = document.createElement('div');
+    row.className='tleg';
+    row.innerHTML=`<div class="tleg-line" style="background:${t.color}"></div><span>${t.label}</span>`;
+    leg.appendChild(row);
+  });
+  leg.classList.add('visible');
+}
+
+function showCard(d) {
+  const meta = clusterMeta[d.cluster]||clusterMeta['_'];
+  document.getElementById('card-name').textContent = d.name;
+  const tag = document.getElementById('card-tag');
+  tag.textContent = meta.name;
+  tag.style.background = meta.bg;
+  tag.style.border = '0.5px solid '+meta.border;
+  tag.style.color = meta.color;
+
+  document.getElementById('card-grid').innerHTML=`
+    <div class="cc"><div class="cl">Eye involvement</div><div class="cv">${d.eye}</div></div>
+    <div class="cc"><div class="cl">Discovery</div><div class="cv">${d.disc}</div></div>
+    <div class="cc"><div class="cl">Main concern</div><div class="cv">${d.concern}</div></div>
+    <div class="cc full"><div class="cl">Gene / inheritance</div><div class="cv">${d.gene}</div></div>
+  `;
+
+  const linksEl = document.getElementById('card-links');
+  if (d.links && d.links.length) {
+    const byId={};diseases.forEach(x=>byId[x.id]=x);
+    linksEl.innerHTML = (d.links||[]).map(lk=>{
+      const t=THEMES[lk.theme];if(!t)return'';
+      const names = lk.targets.map(tid=>byId[tid]?`<strong>${byId[tid].name}</strong>`:tid).join(', ');
+      return `<div class="link-row">
+        <span class="link-pill" style="background:${t.color}22;border:0.5px solid ${t.color}55;color:${t.color}">${t.label}</span>
+        <span class="link-targets">→ ${names}<br><span style="color:#4a5a80">${lk.note}</span></span>
+      </div>`;
+    }).join('');
+    linksEl.style.display='block';
+  } else {
+    linksEl.innerHTML=''; linksEl.style.display='none';
+  }
+
+  document.getElementById('card-note').textContent = d.note;
+  document.getElementById('card').classList.add('visible');
+  document.getElementById('counter').textContent =
+    activeIndex>=0 ? (activeIndex+1)+' / '+mainDiseases.length : '';
+}
+
+function closeCard() {
+  document.getElementById('card').classList.remove('visible');
+}
+
+function resetAll() {
+  diseases.forEach(x=>{
+    document.getElementById('node-'+x.id).className='node-label dim'+(x.connector?' connector':'');
+  });
+  ['A','B','C','D'].forEach(k=>{ const e=document.getElementById('rl-'+k); if(e)e.classList.remove('lit'); });
+  closeCard();
+  activeNode=null; activeIndex=-1;
+  document.getElementById('counter').textContent='';
+  drawClusterLines(null);
+  drawThematicLines(null, linkModeOn);
+  updateThemeLegend(null, linkModeOn);
+}
+
+function positionSideLabels() {
+  const sl2 = document.getElementById('side-left');
+  const sr  = document.getElementById('side-right');
+  sl2.textContent = '← Eye dominant';
+  sr.textContent  = 'Systemic-first →';
+  sl2.style.left = '16px'; sl2.style.top = (H()*0.88)+'px'; sl2.style.color='rgba(167,139,250,0.22)';
+  sr.style.left  = (W()-120)+'px'; sr.style.top = (H()*0.88)+'px'; sr.style.color='rgba(96,165,250,0.22)';
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen().catch(()=>{});
+}
+
+document.addEventListener('keydown', e=>{
+  if (e.key==='ArrowRight'||e.key===' '){e.preventDefault();nextNode();}
+  if (e.key==='ArrowLeft'){e.preventDefault();prevNode();}
+  if (e.key==='Escape') resetAll();
+  if (e.key==='f'||e.key==='F') toggleFullscreen();
+  if (e.key==='l'||e.key==='L') toggleLinkMode();
+});
+
+function init() {
+  drawStars();
+  lineCanvas.width=W(); lineCanvas.height=H();
+  tlineCanvas.width=W(); tlineCanvas.height=H();
+  drawClusterLines(null);
+  drawThematicLines(null, false);
+  buildNodes();
+  positionSideLabels();
+}
+
+let resizeTimer;
+window.addEventListener('resize', ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>{
+    init();
+    if (activeNode){
+      document.getElementById('node-'+activeNode.id).className='node-label active-'+(activeNode.connector?'A':activeNode.cluster)+(activeNode.connector?' connector':'');
+      const linked=getLinkedIds(activeNode);
+      linked.forEach(tid=>{
+        const tel=document.getElementById('node-'+tid);
+        if(tel){const td=diseases.find(x=>x.id===tid);tel.className='node-label linked'+(td&&td.connector?' connector':'');}
+      });
+      drawClusterLines(activeNode.connector?null:activeNode.cluster);
+      drawThematicLines(activeNode.id, linkModeOn);
+    }
+  },80);
+});
+
+init();
+</script>
+</body>
+</html>
